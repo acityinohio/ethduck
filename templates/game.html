@@ -1,0 +1,68 @@
+<!doctype html>
+<html>
+	<head>
+		<script src="//ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
+		<script src="//maxcdn.bootstrapcdn.com/bootstrap/3.3.2/js/bootstrap.min.js"></script>
+		<link href="//maxcdn.bootstrapcdn.com/bootstrap/3.3.2/css/bootstrap.min.css" rel="stylesheet" />
+	</head>
+	<body>
+		<h1>{{if .Game.BlackTurn }}Black's{{else}}White's{{end}} Turn</h1>
+		{{if .Game.ApprovalLock }}<h2>{{if .Game.BlackTurn}}White{{else}}Black{{end}}needs to approve {{.Game.ProposedMove}}</h2>{{end}}
+		<div style="height:100vh">{{.PrettySVG}}</div>
+		<div id="confirm-move" class="modal fade">
+			<form action="/games/{{.Multi}}" method="POST">     
+				<div class="modal-dialog">
+					<div class="modal-content">
+						<div class="modal-header">
+							<button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+							<h4 class="modal-title">Confirm Move</h4>
+						</div>
+						<div class="modal-body">
+							<p>Confirm this move</p>
+							<div class="well" id="move-sig">
+								black-3-0
+							</div>
+							<div class="form-group">
+								<label for="private">Your Private Key</label>
+								<input type=text name="private" required>
+							</div>
+							<input type=hidden name="orig-message" id="orig-message" />
+						</div>
+						<div class="modal-footer">
+							<button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+							<input type="submit" value="Confirm" class="btn btn-primary">
+						</div>
+					</div>
+				</div>
+			</form>
+		</div>
+
+		<script type="text/javascript">
+			$(document).ready(function() {
+				var currentColor = {{if .Game.BlackMove}}"black"{{else}}"white"{{end}};
+				var $confirmMoveModal = $('#confirm-move');
+				var $confirmText = $('#move-sig');
+				var $origText = $('#orig-message');
+
+				$('#board').on('click', '.empty-vertex', function(e) {
+					var $el = $(this);
+					window.el = $el;
+					var x = $el.data('x');
+					var y = $el.data('y');
+					var msg = [ currentColor, x, y ].join('-');
+					$confirmText.text(msg);
+					$origText.attr('value',msg);
+					$confirmMoveModal.modal();
+				});
+			});
+		</script>
+		<style type="text/css">
+			h1 {
+				text-align: center;
+			}
+			.empty-vertex {
+				cursor: pointer;
+			}
+		</style>
+	</body>
+</html>

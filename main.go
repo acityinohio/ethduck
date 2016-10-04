@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"fmt"
 	"math/big"
 	"net/http"
 	"os"
@@ -66,7 +67,7 @@ func newGameHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "/game/"+contractAddr, http.StatusFound)
+	fmt.Fprintf(w, "Your contract address is %s , please wait for it to confirm before playing", contractAddr)
 	return
 }
 

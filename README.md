@@ -1,4 +1,4 @@
-# Bitduck
+# Ethduck
 
 Building an ephemeral Go (Baduk) webapp, using Go, with a library I built with Go, integrated with Ethereum via [BlockCypher's API](https://www.blockcypher.com/). Right now it's in a deep alpha state, but it works! Allows 2-of-2 multsig games with a wager, where the moves (and some pieces of authorization) are embedded into a smart contract on Ethereum (included in the code here).
 

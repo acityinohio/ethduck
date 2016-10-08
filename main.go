@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"math/big"
 	"net/http"
@@ -29,7 +30,7 @@ var templates = template.Must(template.ParseGlob("templates/*"))
 var bcy bcyeth.API
 
 func init() {
-	bcy = bcyeth.API{bcytoken.Token, "eth", "main"}
+	bcy = bcyeth.API{bcytoken.Token}
 }
 
 func main() {
@@ -37,7 +38,7 @@ func main() {
 	http.HandleFunc("/games/", gameHandler)
 	http.HandleFunc("/new/", newGameHandler)
 	http.HandleFunc("/authorize/", authorizeHandler)
-	http.ListenAndServe(":8080", nil)
+	http.ListenAndServe(":80", nil)
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
@@ -83,7 +84,7 @@ func gameHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	type gameTemp struct {
-		Game      Game
+		Game
 		PrettySVG string
 	}
 	necessary := gameTemp{gameBoard, gameBoard.State.PrettySVG()}
@@ -176,6 +177,7 @@ func authorizeHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		http.Redirect(w, r, "/game/"+contractAddr, http.StatusFound)
 	} else {
+		//TODO: authorize win/draw?
 		var message string
 		x, y, color := getProposedMove(contractAddr)
 		if color == 1 {
@@ -183,7 +185,7 @@ func authorizeHandler(w http.ResponseWriter, r *http.Request) {
 		} else {
 			message = "White "
 		}
-		message += "wants to move on" + strconv.Itoa(x) + " , " + strconv.Itoa(y) + "."
+		message += "wants to move on " + strconv.Itoa(x) + ", " + strconv.Itoa(y) + "."
 		err := templates.ExecuteTemplate(w, "authorize.html", message)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -191,6 +193,14 @@ func authorizeHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
+}
+
+//TODO
+func confirmHandler(w http.ResponseWriter, r *http.Request) {
+}
+
+//TODO
+func winHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 //contract helpers
@@ -217,7 +227,7 @@ func importSol() (sol string) {
 		panic(err)
 	}
 	defer file.Close()
-	//make solidity one line without tabs for BlockCypher API
+	//convert solidity to string
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		sol += strings.Replace(scanner.Text(), "\t", " ", -1) + "\n"
@@ -270,7 +280,11 @@ func getSize(contractAddr string) (size int, err error) {
 	if err != nil {
 		return
 	}
-	size = result.Results[0].(int)
+	num, err := result.Results[0].(json.Number).Int64()
+	if err != nil {
+		return
+	}
+	size = int(num)
 	return
 }
 
@@ -279,7 +293,11 @@ func getNumMoves(contractAddr string) (numMoves int, err error) {
 	if err != nil {
 		return
 	}
-	numMoves = result.Results[0].(int)
+	num, err := result.Results[0].(json.Number).Int64()
+	if err != nil {
+		return
+	}
+	numMoves = int(num)
 	return
 }
 
@@ -288,7 +306,19 @@ func getMove(contractAddr string, move int) (x, y, color int) {
 	if err != nil {
 		return
 	}
-	x, y, color = result.Results[0].(int), result.Results[1].(int), result.Results[2].(int)
+	xNum, err := result.Results[0].(json.Number).Int64()
+	if err != nil {
+		return
+	}
+	yNum, err := result.Results[1].(json.Number).Int64()
+	if err != nil {
+		return
+	}
+	colorNum, err := result.Results[2].(json.Number).Int64()
+	if err != nil {
+		return
+	}
+	x, y, color = int(xNum), int(yNum), int(colorNum)
 	return
 }
 
@@ -297,6 +327,18 @@ func getProposedMove(contractAddr string) (x, y, color int) {
 	if err != nil {
 		return
 	}
-	x, y, color = result.Results[0].(int), result.Results[1].(int), result.Results[2].(int)
+	xNum, err := result.Results[0].(json.Number).Int64()
+	if err != nil {
+		return
+	}
+	yNum, err := result.Results[1].(json.Number).Int64()
+	if err != nil {
+		return
+	}
+	colorNum, err := result.Results[2].(json.Number).Int64()
+	if err != nil {
+		return
+	}
+	x, y, color = int(xNum), int(yNum), int(colorNum)
 	return
 }

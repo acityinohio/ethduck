@@ -6,17 +6,16 @@
 </head>
 <body>
 	<h1>Authorize Move</h1>
-	<h2>{{ .message }} Do you approve?</h2>
+	<h2>{{ . }} Do you approve?</h2>
 	<div class="well">
 		<form action="/authorize/" method="POST">
 			<div class="form-group">
-				<label for="private">Your Private Key</label>
-				<input type="text" name="private" placeholder="privatekey" required class="form-control" />
-			</div>
-			<div class="form-group">
-				<label for="approve">Approve?</label>
 				<input type="radio" name="approve" value="true">Yes<br>
 				<input type="radio" name="approve" value="false">No<br>
+			</div>
+			<div class="form-group">
+				<label for="private">Your Private Key</label>
+				<input type="text" name="private" placeholder="privatekey" required class="form-control" />
 			</div>
 			<input type="submit" class="btn btn-primary btn-submit">
 		</form>

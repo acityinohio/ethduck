@@ -10,9 +10,11 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+
+	"../bcytoken"
 )
 
-const baseURL = "https://api.blockcypher.com/v1/"
+const baseURL = bcytoken.BaseURL
 
 //API stores your BlockCypher Token, and the coin/chain
 //you're querying. Only combo available is "eth"/"main" for now.
@@ -20,9 +22,9 @@ const baseURL = "https://api.blockcypher.com/v1/"
 //All your credentials are stored within an API struct, as are
 //many of the API methods.
 //You can allocate an API struct like so:
-//	bc = gobcy.API{"your-api-token","eth","main"}
+//	bc = gobcy.API{"your-api-token"}
 type API struct {
-	Token, Coin, Chain string
+	Token string
 }
 
 //getResponse is a boilerplate for HTTP GET responses.
@@ -37,6 +39,7 @@ func getResponse(target *url.URL, decTarget interface{}) (err error) {
 		return
 	}
 	dec := json.NewDecoder(resp.Body)
+	dec.UseNumber()
 	err = dec.Decode(decTarget)
 	return
 }
@@ -58,6 +61,7 @@ func postResponse(target *url.URL, encTarget interface{}, decTarget interface{})
 		return
 	}
 	dec := json.NewDecoder(resp.Body)
+	dec.UseNumber()
 	err = dec.Decode(decTarget)
 	return
 }
@@ -140,7 +144,7 @@ func respErrorMaker(statusCode int, body io.Reader) (err error) {
 
 //constructs BlockCypher URLs with parameters for requests
 func (api *API) buildURL(u string, params map[string]string) (target *url.URL, err error) {
-	target, err = url.Parse(baseURL + api.Coin + "/" + api.Chain + u)
+	target, err = url.Parse(baseURL + u)
 	if err != nil {
 		return
 	}

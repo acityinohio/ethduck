@@ -5,12 +5,19 @@
 		<script src="//maxcdn.bootstrapcdn.com/bootstrap/3.3.2/js/bootstrap.min.js"></script>
 		<link href="//maxcdn.bootstrapcdn.com/bootstrap/3.3.2/css/bootstrap.min.css" rel="stylesheet" />
 	</head>
+	{{if not .Game.Confirmed }}
+		<h1>Game needs to be confirmed.</h1>
+		<h2>White stone player should <a href="/confirm/{{.Game.ContractAddr}}">click here to add their wager and confirm the game.</a></h2>
+	{{else}}
 	<body>
 		<h1>{{if .Game.BlackTurn }}Black's{{else}}White's{{end}} Turn</h1>
-		{{if .Game.ApprovalLock }}<h2>{{if .Game.BlackTurn}}White{{else}}Black{{end}}needs to approve {{.Game.ProposedMove}}</h2>{{end}}
+		{{if .Game.ApprovalLock }}
+			<h2>{{if .Game.BlackTurn}}White{{else}}Black{{end}}needs to approve {{.Game.ProposedMove}}</h2>
+			<h2><a href="/authorize/{{.Game.ContractAddr}}">Approve here</a></h2>
+		{{end}}
 		<div style="height:100vh">{{.PrettySVG}}</div>
 		<div id="confirm-move" class="modal fade">
-			<form action="/games/{{.Multi}}" method="POST">     
+			<form action="/games/{{.ContractAddr}}" method="POST">
 				<div class="modal-dialog">
 					<div class="modal-content">
 						<div class="modal-header">
@@ -39,7 +46,7 @@
 
 		<script type="text/javascript">
 			$(document).ready(function() {
-				var currentColor = {{if .Game.BlackMove}}"black"{{else}}"white"{{end}};
+				var currentColor = {{if .Game.BlackTurn}}"black"{{else}}"white"{{end}};
 				var $confirmMoveModal = $('#confirm-move');
 				var $confirmText = $('#move-sig');
 				var $origText = $('#orig-message');
@@ -65,4 +72,5 @@
 			}
 		</style>
 	</body>
+	{{ end }}
 </html>

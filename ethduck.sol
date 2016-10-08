@@ -6,7 +6,6 @@ contract EthDuck {
 	uint8 public size;
 	address public black;
 	address public white;
-	address public winner;
 	bool public confirmed;
 	bool public blackTurn;
 	bool public approvalLock;
@@ -19,6 +18,7 @@ contract EthDuck {
 	}
 	Move[] moves;
 	Move public proposed;
+	State public winner;
 
 	//constructor, requires boardsize and opponent
 	function EthDuck(uint8 boardSize, address player2) payable {
@@ -106,7 +106,11 @@ contract EthDuck {
 	onlyPlayers()
 	onlyPropose()
 	{
-		winner = msg.sender;
+		if (msg.sender == black) {
+			winner = State.Black;
+		} else {
+			winner = State.White;
+		}
 		approvalLock = true;
 	}
 
@@ -115,18 +119,20 @@ contract EthDuck {
 	onlyPlayers()
 	onlyAuthorize()
 	{
-		if (_approve) {
-			if (!winner.send(3 * this.balance / 4)) {
-				throw;
-			}
-			if (winner == black) {
-				selfdestruct(white);
-			} else {
-				selfdestruct(black);
-			}
-		} else {
+		if (!_approve){
 			delete winner;
 			approvalLock = false;
+		}
+		if (winner == State.Black) {
+			if (!black.send(3 * this.balance / 4)) {
+				throw;
+			}
+			selfdestruct(white);
+		} else {
+			if (!white.send(3 * this.balance / 4)) {
+				throw;
+			}
+			selfdestruct(black);
 		}
 	}
 

@@ -1,14 +1,13 @@
 <!doctype html>
 <html>
 <head>
-	<title>Ethduck Quack Approve</title>
+	<title>Ethduck Quack Approval Page</title>
 	<link rel="stylesheet" href="//maxcdn.bootstrapcdn.com/bootstrap/3.3.2/css/bootstrap.min.css">
 </head>
 <body>
-	<h1>Authorize Move</h1>
-	<h2>{{ . }} Do you approve?</h2>
+	<h2>{{ .Message }} Do you approve?</h2>
 	<div class="well">
-		<form action="/authorize/" method="POST">
+		<form action="{{ .Post }}" method="POST">
 			<div class="form-group">
 				<input type="radio" name="approve" value="true">Yes<br>
 				<input type="radio" name="approve" value="false">No<br>

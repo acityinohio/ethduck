@@ -34,7 +34,7 @@ func (api *API) GetContract(address string) (result Contract, err error) {
 	if err != nil {
 		return
 	}
-	err = getResponse(u, &address)
+	err = getResponse(u, &result)
 	return
 }
 

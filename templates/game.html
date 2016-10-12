@@ -11,9 +11,17 @@
 	{{else}}
 	<body>
 		<h1>{{if .Game.BlackTurn }}Black's{{else}}White's{{end}} Turn</h1>
-		{{if .Game.ApprovalLock }}
-			<h2>{{if .Game.BlackTurn}}White{{else}}Black{{end}}needs to approve {{.Game.ProposedMove}}</h2>
-			<h2><a href="/authorize/{{.Game.ContractAddr}}">Approve here</a></h2>
+		{{if or .Game.Draw .Game.Winner }}
+			{{if .Game.Draw }}
+				<h3>Draw proposed! {{if .Game.BlackTurn}}White{{else}}Black{{end}} needs to <a href="/auth/draw/{{.Game.ContractAddr}}">approve here.</a></h3>
+			{{else if .Game.Winner}}
+				<h3>{{if eq .Game.Winner 1 }}Black{{else}}White{{end}}proposed that they won! {{if .Game.BlackTurn}}White{{else}}Black{{end}} needs to <a href="/auth/win/{{.Game.ContractAddr}}">approve here.</a></h3>
+			{{end}}
+		{{else if .Game.ApprovalLock}}
+			<h3>{{if .Game.BlackTurn}}White{{else}}Black{{end}} needs to approve {{.Game.ProposedMove}} <a href="/auth/move/{{.Game.ContractAddr}}">Approve here</a></h3>
+		{{else}}
+			<p>Current Black Score: {{.Game.BlackScore}}. Current White Score: {{.Game.WhiteScore}}.</p>
+			<p><a href="/propose/win/">Propose self winner here."</a>  <a href="/propose/draw/">Propose draw here.</a>
 		{{end}}
 		<div style="height:100vh">{{.PrettySVG}}</div>
 		<div id="confirm-move" class="modal fade">

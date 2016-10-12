@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"log"
 	"math/big"
 	"net/http"
 	"os"
@@ -22,6 +23,10 @@ type Game struct {
 	Confirmed    bool
 	BlackTurn    bool
 	ApprovalLock bool
+	Draw         bool
+	Winner       int
+	BlackScore   int
+	WhiteScore   int
 	ProposedMove string
 	State        baduk.Board
 }
@@ -37,7 +42,10 @@ func main() {
 	http.HandleFunc("/", indexHandler)
 	http.HandleFunc("/games/", gameHandler)
 	http.HandleFunc("/new/", newGameHandler)
-	http.HandleFunc("/authorize/", authorizeHandler)
+	http.HandleFunc("/confirm/", confirmGameHandler)
+	http.HandleFunc("/auth/move/", authorizeMoveHandler)
+	//http.HandleFunc("/auth/win/", authorizeWinHandler)
+	//http.HandleFunc("/auth/draw/", authorizeDrawHandler)
 	http.ListenAndServe(":80", nil)
 }
 
@@ -70,6 +78,61 @@ func newGameHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	fmt.Fprintf(w, "Your contract address is %s , please wait for it to confirm before playing", contractAddr)
 	return
+}
+
+func confirmGameHandler(w http.ResponseWriter, r *http.Request) {
+	contractAddr := r.URL.Path[len("/confirm/"):]
+	if r.Method == "POST" {
+		f := r.FormValue
+		private := f("private")
+		approve, _ := strconv.ParseBool(f("approve"))
+		if approve != true {
+			http.Redirect(w, r, "/", http.StatusFound)
+			return
+		}
+		addr, err := bcy.GetAddrBal(contractAddr)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		err = confirmNewGame(contractAddr, private, addr.Balance)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		http.Redirect(w, r, "/games/"+contractAddr, http.StatusFound)
+		return
+	} else {
+		confirmed, err := getConfirmed(contractAddr)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		addr, err := bcy.GetAddrBal(contractAddr)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		var message string
+		if confirmed {
+			message = "This game is already confirmed, you don't need to send money to this contract."
+		} else {
+			message = "You need to confirm your game. Please enter your private key. The wei-ger is " + addr.Balance.String() + "."
+		}
+		data := struct {
+			Message string
+			Post    string
+		}{
+			message,
+			"/confirm/" + contractAddr,
+		}
+		err = templates.ExecuteTemplate(w, "authorize.html", data)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		return
+	}
 }
 
 func gameHandler(w http.ResponseWriter, r *http.Request) {
@@ -109,7 +172,15 @@ func remakeGame(contractAddr string) (game Game, err error) {
 	if err != nil {
 		return
 	}
-	if game.ApprovalLock {
+	game.Draw, err = getDraw(contractAddr)
+	if err != nil {
+		return
+	}
+	game.Winner, err = getWinner(contractAddr)
+	if err != nil {
+		return
+	}
+	if game.ApprovalLock && !game.Draw && game.Winner == 0 {
 		x, y, color := getProposedMove(contractAddr)
 		if color == 1 {
 			game.ProposedMove = "black-"
@@ -138,6 +209,7 @@ func remakeGame(contractAddr string) (game Game, err error) {
 			return
 		}
 	}
+	game.BlackScore, game.WhiteScore = game.State.Score()
 	return
 }
 
@@ -160,12 +232,12 @@ func moveHandler(w http.ResponseWriter, r *http.Request, gameBoard Game) {
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
-	http.Redirect(w, r, "/authorize/"+gameBoard.ContractAddr, http.StatusFound)
+	http.Redirect(w, r, "/game/"+gameBoard.ContractAddr, http.StatusFound)
 	return
 }
 
-func authorizeHandler(w http.ResponseWriter, r *http.Request) {
-	contractAddr := r.URL.Path[len("/authorize/"):]
+func authorizeMoveHandler(w http.ResponseWriter, r *http.Request) {
+	contractAddr := r.URL.Path[len("/auth/move/"):]
 	if r.Method == "POST" {
 		f := r.FormValue
 		private := f("private")
@@ -175,9 +247,8 @@ func authorizeHandler(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
-		http.Redirect(w, r, "/game/"+contractAddr, http.StatusFound)
+		http.Redirect(w, r, "/games/"+contractAddr, http.StatusFound)
 	} else {
-		//TODO: authorize win/draw?
 		var message string
 		x, y, color := getProposedMove(contractAddr)
 		if color == 1 {
@@ -186,7 +257,14 @@ func authorizeHandler(w http.ResponseWriter, r *http.Request) {
 			message = "White "
 		}
 		message += "wants to move on " + strconv.Itoa(x) + ", " + strconv.Itoa(y) + "."
-		err := templates.ExecuteTemplate(w, "authorize.html", message)
+		data := struct {
+			Message string
+			Post    string
+		}{
+			message,
+			"/auth/move/" + contractAddr,
+		}
+		err := templates.ExecuteTemplate(w, "authorize.html", data)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -195,12 +273,10 @@ func authorizeHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-//TODO
-func confirmHandler(w http.ResponseWriter, r *http.Request) {
+func authorizeWinHandler(w http.ResponseWriter, r *http.Request) {
 }
 
-//TODO
-func winHandler(w http.ResponseWriter, r *http.Request) {
+func authorizeDrawHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 //contract helpers
@@ -236,14 +312,40 @@ func importSol() (sol string) {
 	return
 }
 
+//confirm game, add wager
+func confirmNewGame(contractAddr string, private string, value big.Int) (err error) {
+	_, err = bcy.CallContract(bcyeth.Contract{Private: private, GasLimit: 80000, Value: value}, contractAddr, "confirmNewGame")
+	return
+}
+
 //make moves
 func proposeMove(contractAddr string, private string, x int, y int) (err error) {
-	_, err = bcy.CallContract(bcyeth.Contract{Private: private, Params: []interface{}{x, y}, GasLimit: 200000}, contractAddr, "proposeMove")
+	_, err = bcy.CallContract(bcyeth.Contract{Private: private, Params: []interface{}{x, y}, GasLimit: 100000}, contractAddr, "proposeMove")
 	return
 }
 
 func authorizeMove(contractAddr string, private string, approve bool) (err error) {
 	_, err = bcy.CallContract(bcyeth.Contract{Private: private, Params: []interface{}{approve}, GasLimit: 200000}, contractAddr, "authorizeMove")
+	return
+}
+
+func proposeDraw(contractAddr string, private string) (err error) {
+	_, err = bcy.CallContract(bcyeth.Contract{Private: private, GasLimit: 80000}, contractAddr, "proposeDraw")
+	return
+}
+
+func authorizeDraw(contractAddr string, private string, approve bool) (err error) {
+	_, err = bcy.CallContract(bcyeth.Contract{Private: private, Params: []interface{}{approve}, GasLimit: 200000}, contractAddr, "authorizeDraw")
+	return
+}
+
+func proposeWinner(contractAddr string, private string) (err error) {
+	_, err = bcy.CallContract(bcyeth.Contract{Private: private, GasLimit: 80000}, contractAddr, "proposeWinner")
+	return
+}
+
+func authorizeWinner(contractAddr string, private string, approve bool) (err error) {
+	_, err = bcy.CallContract(bcyeth.Contract{Private: private, Params: []interface{}{approve}, GasLimit: 200000}, contractAddr, "authorizeWinner")
 	return
 }
 
@@ -272,6 +374,29 @@ func getApprovalLock(contractAddr string) (approvalLock bool, err error) {
 		return
 	}
 	approvalLock = result.Results[0].(bool)
+	return
+}
+
+func getWinner(contractAddr string) (winner int, err error) {
+	result, err := bcy.CallContract(bcyeth.Contract{Private: "c025000000000000000000000000000000000000000000000000000000000000"}, contractAddr, "winner")
+	if err != nil {
+		return
+	}
+	log.Println(result.Results)
+	num, err := result.Results[0].(json.Number).Int64()
+	if err != nil {
+		return
+	}
+	winner = int(num)
+	return
+}
+
+func getDraw(contractAddr string) (draw bool, err error) {
+	result, err := bcy.CallContract(bcyeth.Contract{Private: "c025000000000000000000000000000000000000000000000000000000000000"}, contractAddr, "draw")
+	if err != nil {
+		return
+	}
+	draw = result.Results[0].(bool)
 	return
 }
 
